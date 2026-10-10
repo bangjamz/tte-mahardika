@@ -83,6 +83,8 @@
   .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; word-break: break-all; }
   details { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 12px; }
   summary { cursor: pointer; font-weight: 600; color: var(--navy); }
+  details.fold { border: 0; padding: 0; margin: 0; }
+  details.fold > summary { font-size: 18px; font-weight: 700; }
 
   table.list { width: 100%; border-collapse: collapse; }
   table.list th { text-align: left; font-size: 13px; color: var(--muted); padding: 8px; border-bottom: 2px solid var(--border); }
@@ -151,8 +153,9 @@
     </section>
 
     <section class="card hidden" id="checkCard">
-      <h2>Periksa file PDF</h2>
-      <p>Pemindaian QR belum memeriksa isi file. Pilih PDF yang Anda terima untuk membandingkannya dengan file terdaftar.</p>
+      <details class="fold">
+      <summary>Periksa file PDF</summary>
+      <p style="margin-top:12px">Pemindaian QR belum memeriksa isi file. Pilih PDF yang Anda terima untuk membandingkannya dengan file terdaftar.</p>
       <div class="row" style="margin:12px 0">
         <button class="btn secondary block-sm" id="pickBtn" type="button">Pilih PDF</button>
         <input type="file" id="fileInput" accept="application/pdf,.pdf" class="hidden" aria-label="Pilih PDF">
@@ -171,6 +174,7 @@
           <dt>Waktu pemeriksaan</dt><dd id="checkTime" style="font-weight:400">-</dd>
         </dl>
       </details>
+      </details>
     </section>
 
     <section class="card">
@@ -186,7 +190,7 @@
     <div id="footContact"></div>
   </footer>
 
-  <script>window.VERIFY_API = "https://script.google.com/macros/s/AKfycbyXhK-T3Q-dsFps5be7MNawL1RudPth_ITQ5vQsetNVv7izUYgI71ov-Y27f4KZi2l0/exec"; window.VERIFY_SITE = "https://bangjamz.github.io/tte-mahardika/";</script>
+  <script>window.VERIFY_API = "https://script.google.com/macros/s/AKfycbyXhK-T3Q-dsFps5be7MNawL1RudPth_ITQ5vQsetNVv7izUYgI71ov-Y27f4KZi2l0/exec"; window.VERIFY_SITE = "https://tte.mahardika.ac.id/";</script>
 <script>
 (function () {
   'use strict';
