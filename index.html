@@ -103,6 +103,17 @@
   .stage canvas { max-width: 100%; height: auto; }
   .qrbox { position: absolute; border: 2px solid var(--red); background: rgba(255,255,255,.9); cursor: move; display: flex; align-items: center; justify-content: center; }
   .qrbox canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+  .qrbox.sel { border-width: 3px; box-shadow: 0 0 0 3px rgba(168, 8, 8, .25); }
+  .qrbox img { width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  .qrbox .tag { position: absolute; top: -11px; left: -11px; min-width: 22px; height: 22px; border-radius: 11px; background: var(--red); color: #fff; font: 700 13px/22px system-ui, sans-serif; text-align: center; pointer-events: none; }
+  .signer-row { display: grid; grid-template-columns: 26px minmax(0, 1.3fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .signer-row .signer-num { font-weight: 700; color: var(--muted); }
+  .signer-row.invalid input { border-color: var(--red); }
+  .field.auto input, .field.auto select, .signer-row.auto input { background: #fff8dc; }
+  .signer-pick { display: block; width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font: inherit; font-size: 14px; cursor: pointer; }
+  .signer-pick.sel { border-color: var(--red); background: var(--bad-bg); font-weight: 600; }
+  .signer-pick small { display: block; color: var(--muted); font-weight: 400; }
+  #finalPreview canvas { width: 100%; height: auto; border: 1px solid var(--border); margin-bottom: 6px; }
   .qr-preview { width: 200px; height: 200px; border: 1px solid var(--border); image-rendering: pixelated; }
   .spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid var(--border); border-top-color: var(--navy); border-radius: 50%; animation: spin 1s linear infinite; vertical-align: -3px; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -113,6 +124,8 @@
   @media (max-width: 700px) {
     .card { padding: 16px; }
     .grid2, .placer, .placer.final, .placer.detail { grid-template-columns: 1fr; }
+    .signer-row { grid-template-columns: 26px minmax(0, 1fr) auto; }
+    .signer-row input:nth-of-type(2) { grid-column: 2; }
     dl.meta { grid-template-columns: 1fr; gap: 2px; }
     dl.meta dd { margin-bottom: 8px; }
     .btn.block-sm { width: 100%; }
@@ -129,10 +142,33 @@
       <h1>Verifikasi Dokumen</h1>
       <div class="sub" id="publisherName"></div>
     </div>
+    <a class="btn secondary small hidden" id="navHome" href="./">Beranda</a>
   </header>
 
   <main class="wrap">
-    <section class="card" aria-live="polite">
+    <section class="card hidden" id="homeCard">
+      <h2>Layanan verifikasi dokumen</h2>
+      <p>Dokumen resmi yang terdaftar di sini memuat QR. Pindai QR itu dengan kamera ponsel untuk melihat status dan informasi dokumennya.</p>
+      <div class="row" style="margin-top:14px">
+        <a class="btn block-sm hidden" id="homeApply" href="ajukan/">Ajukan TTE</a>
+        <button class="btn secondary block-sm" id="homeCheck" type="button">Cek Dokumen</button>
+      </div>
+    </section>
+
+    <section class="card hidden" id="lookupCard">
+      <h2>Cek dokumen</h2>
+      <p><strong>Punya dokumen cetak?</strong> Pindai QR pada dokumen dengan kamera ponsel.</p>
+      <p><strong>Punya file PDF-nya?</strong> Pilih file itu di sini. Bila PDF dibuka di ponsel, Anda juga bisa mengetuk QR di dalamnya.</p>
+      <div class="row" style="margin:12px 0">
+        <button class="btn block-sm" id="lookupBtn" type="button">Pilih file PDF</button>
+        <input type="file" id="lookupInput" accept="application/pdf,.pdf" class="hidden" aria-label="Pilih file PDF untuk dicek">
+        <span id="lookupName" class="muted grow"></span>
+      </div>
+      <p class="muted">File diperiksa di perangkat Anda. Yang dikirim hanya sidik digitalnya (hash), bukan isi file.</p>
+      <div id="lookupResult" class="alert neutral hidden" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card" id="statusCard" aria-live="polite">
       <h2>Status registrasi</h2>
       <div id="regStatus" class="status neutral">
         <div class="icon" aria-hidden="true"><span class="spinner"></span></div>
@@ -203,6 +239,8 @@
     hasToken = !!raw;
     token = /^[A-Za-z0-9_-]{43}$/.test(raw) ? raw : '';
   }
+  // QR tiap penandatangan membawa urutannya (p), agar namanya bisa ditonjolkan.
+  var signerOrder = API ? parseInt(new URLSearchParams(location.search).get('p'), 10) || 0 : 0;
   var refHash = '';
   var revoked = false;
   var checkSeq = 0;
@@ -253,14 +291,41 @@
     }
   }
 
-  function addMeta(list, label, value) {
+  function addMeta(list, label, value, sub, mark) {
     if (!value) return;
     var dt = document.createElement('dt');
     dt.textContent = label;
     var dd = document.createElement('dd');
     dd.textContent = value;
+    if (sub) {
+      var small = document.createElement('div');
+      small.className = 'muted';
+      small.style.fontWeight = '400';
+      small.textContent = sub;
+      dd.appendChild(small);
+    }
+    if (mark) {
+      var badge = document.createElement('span');
+      badge.className = 'badge ok';
+      badge.style.marginTop = '4px';
+      badge.textContent = mark;
+      dd.appendChild(badge);
+    }
     list.appendChild(dt);
     list.appendChild(dd);
+  }
+
+  /** Satu penandatangan tampil seperti semula; lebih dari satu tampil sebagai daftar bernomor. */
+  function addSigners(list, doc) {
+    var signers = doc.signers && doc.signers.length ? doc.signers : [{ order: 1, name: doc.signerName, role: doc.signerRole }];
+    if (signers.length === 1) {
+      addMeta(list, 'Penandatangan', signers[0].name);
+      addMeta(list, 'Jabatan', signers[0].role);
+      return;
+    }
+    signers.forEach(function (s) {
+      addMeta(list, 'Penandatangan ' + s.order, s.name, s.role, s.order === signerOrder ? 'QR yang Anda buka' : '');
+    });
   }
 
   function renderPublisher(p) {
@@ -289,8 +354,7 @@
     addMeta(list, 'Judul', doc.title);
     addMeta(list, 'Jenis', doc.type);
     addMeta(list, 'Tanggal dokumen', formatDate(doc.issueDate));
-    addMeta(list, 'Penandatangan', doc.signerName);
-    addMeta(list, 'Jabatan', doc.signerRole);
+    addSigners(list, doc);
     addMeta(list, 'Unit', doc.unit);
     addMeta(list, 'Didaftarkan', formatTime(doc.publishedAt));
     if (revoked) {
@@ -308,6 +372,65 @@
     } else {
       render(res);
     }
+  }
+
+  /* ---------- Beranda dan cek dokumen lewat file (hanya pada halaman statis) ---------- */
+  function showHome(on) {
+    show('homeCard', on);
+    show('lookupCard', on);
+    show('statusCard', !on);
+    show('navHome', !on);
+  }
+  function setLookup(kind, title, message) {
+    var box = $('lookupResult');
+    box.className = 'alert ' + kind;
+    box.textContent = '';
+    var strong = document.createElement('strong');
+    strong.textContent = title;
+    box.appendChild(strong);
+    box.appendChild(document.createTextNode(message));
+  }
+  function fileLabel(file) {
+    return file.name + ' (' + (file.size < 1048576 ? Math.ceil(file.size / 1024) + ' KB' : (file.size / 1048576).toFixed(1) + ' MB') + ')';
+  }
+  function hashFile(file) {
+    if (!window.crypto || !crypto.subtle || !file.arrayBuffer) return Promise.reject(new Error('UNSUPPORTED'));
+    return file.arrayBuffer().then(function (buf) { return crypto.subtle.digest('SHA-256', buf); }).then(toHex);
+  }
+  function lookupFile(file) {
+    if (!file) return;
+    var seq = ++checkSeq;
+    $('lookupName').textContent = fileLabel(file);
+    setLookup('neutral', 'Memeriksa file...', ' Mohon tunggu.');
+    var hex = '';
+    hashFile(file).then(function (h) {
+      hex = h;
+      return fetch(API + '?format=json&sha256=' + hex, { credentials: 'omit', cache: 'no-store' });
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (res) {
+      if (seq !== checkSeq) return;
+      if (!res || !res.registration || res.registration === 'ERROR') throw new Error('ERROR');
+      if (!res.document) {
+        setLookup('neutral', 'Tidak ditemukan', 'File ini tidak ada dalam daftar. Bisa jadi dokumen belum didaftarkan, atau file sudah berubah (diedit, disimpan ulang, atau dikompres). Bila dokumen memuat QR, pindai QR-nya.');
+        return;
+      }
+      showHome(false);
+      render(res);
+      $('fileName').textContent = fileLabel(file);
+      $('hashFile').textContent = hex;
+      $('checkTime').textContent = formatTime(new Date().toISOString());
+      setCheck('ok', '\u2713 File cocok', 'File yang dipilih identik secara byte dengan PDF referensi terdaftar.' +
+        (revoked ? ' Kesamaan file tidak mengubah status pencabutan.' : ''));
+      document.querySelector('#checkCard details.fold').open = true;
+      window.scrollTo(0, 0);
+    }).catch(function (err) {
+      if (seq !== checkSeq) return;
+      setLookup('warn', 'Pemeriksaan gagal', err && err.message === 'UNSUPPORTED'
+        ? 'Browser ini tidak mendukung pemeriksaan file. Gunakan browser versi terbaru.'
+        : 'File belum dapat diperiksa. Coba lagi beberapa saat lagi.');
+    });
   }
 
   function load(first) {
@@ -358,17 +481,14 @@
       setCheck('neutral', 'Belum diperiksa', 'Pilih PDF untuk memulai pemeriksaan.');
       return;
     }
-    $('fileName').textContent = file.name + ' (' + (file.size < 1048576 ? Math.ceil(file.size / 1024) + ' KB' : (file.size / 1048576).toFixed(1) + ' MB') + ')';
+    $('fileName').textContent = fileLabel(file);
     if (!window.crypto || !crypto.subtle || !file.arrayBuffer) {
       setCheck('warn', 'Pemeriksaan gagal', 'Browser ini tidak mendukung pemeriksaan file. Gunakan browser versi terbaru.');
       return;
     }
     setCheck('neutral', 'Memeriksa file…', 'Mohon tunggu.');
-    file.arrayBuffer().then(function (buf) {
-      return crypto.subtle.digest('SHA-256', buf);
-    }).then(function (digest) {
+    hashFile(file).then(function (hex) {
       if (seq !== checkSeq) return;
-      var hex = toHex(digest);
       $('hashFile').textContent = hex;
       $('checkTime').textContent = formatTime(new Date().toISOString());
       if (hex === refHash) {
@@ -387,6 +507,13 @@
   $('pickBtn').addEventListener('click', function () { $('fileInput').click(); });
   $('retryBtn').addEventListener('click', function () { load(false); });
   if (API && window.VERIFY_SITE) $('hostHint').textContent = window.VERIFY_SITE;
+  if (API) {
+    show('homeApply', !!window.VERIFY_AJUKAN);
+    showHome(!hasToken);
+    $('homeCheck').addEventListener('click', function () { $('lookupBtn').focus(); $('lookupCard').scrollIntoView({ behavior: 'smooth' }); });
+    $('lookupBtn').addEventListener('click', function () { $('lookupInput').click(); });
+    $('lookupInput').addEventListener('change', function (e) { show('lookupResult', true); lookupFile(e.target.files[0]); });
+  }
   load(!API);
 })();
 </script>
