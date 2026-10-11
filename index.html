@@ -152,7 +152,7 @@
       <p>Dokumen resmi yang terdaftar di sini memuat QR. Pindai QR itu dengan kamera ponsel untuk melihat status dan informasi dokumennya.</p>
       <div class="row" style="margin-top:14px">
         <a class="btn block-sm hidden" id="homeApply" href="ajukan/">Ajukan TTE</a>
-        <button class="btn secondary block-sm" id="homeCheck" type="button">Cek Dokumen</button>
+        <button class="btn secondary block-sm" id="homeCheck" type="button" aria-expanded="false" aria-controls="lookupCard">Cek Dokumen</button>
       </div>
     </section>
 
@@ -378,7 +378,8 @@
   /* ---------- Beranda dan cek dokumen lewat file (hanya pada halaman statis) ---------- */
   function showHome(on) {
     show('homeCard', on);
-    show('lookupCard', on);
+    // Bagian Cek dokumen baru dibuka saat tombolnya diklik, agar beranda tetap ringkas.
+    if (!on) show('lookupCard', false);
     show('statusCard', !on);
     show('navHome', !on);
   }
@@ -511,7 +512,12 @@
   if (API) {
     show('homeApply', !!window.VERIFY_AJUKAN);
     showHome(!hasToken);
-    $('homeCheck').addEventListener('click', function () { $('lookupBtn').focus(); $('lookupCard').scrollIntoView({ behavior: 'smooth' }); });
+    $('homeCheck').addEventListener('click', function () {
+      show('lookupCard', true);
+      $('homeCheck').setAttribute('aria-expanded', 'true');
+      $('lookupCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      $('lookupBtn').focus();
+    });
     $('lookupBtn').addEventListener('click', function () { $('lookupInput').click(); });
     $('lookupInput').addEventListener('change', function (e) { show('lookupResult', true); lookupFile(e.target.files[0]); });
   }
