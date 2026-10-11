@@ -296,6 +296,18 @@ var DocReader = (function () {
   function norm(text) { return String(text).toLowerCase().replace(/[^a-z0-9]/g, ''); }
   function clean(text) { return String(text).replace(/\s+/g, ' ').trim(); }
 
+  /**
+   * Teks berhuruf renggang ("K e p . 0 0 1 / F T") dirapatkan kembali. Dianggap renggang bila
+   * sebagian besar potongannya hanya satu karakter. Jarak dua spasi atau lebih dipertahankan sebagai satu spasi.
+   */
+  function despace(text) {
+    var tokens = String(text).trim().split(/ +/);
+    if (tokens.length < 4) return text;
+    var single = tokens.filter(function (t) { return t.length === 1; }).length;
+    if (single / tokens.length < 0.7) return text;
+    return String(text).trim().replace(/ {2,}/g, '\u0000').replace(/ /g, '').replace(/\u0000/g, ' ');
+  }
+
   /** Nama lengkap dan nama tanpa gelar, untuk dicocokkan dengan teks PDF. */
   function nameVariants(name) {
     var full = norm(name);
@@ -322,7 +334,8 @@ var DocReader = (function () {
       line.items.forEach(function (it) {
         // Jarak lebih dari kira-kira satu huruf besar dianggap pindah kolom (tab atau blok tanda tangan sejajar).
         if (seg && it.x - seg.x2 <= Math.max(8, it.h * 0.8)) {
-          seg.text += (it.x - seg.x2 > 1 ? ' ' : '') + it.str;
+          // Spasi hanya bila jaraknya kira-kira selebar spasi; jarak antarhuruf yang kecil tidak dihitung.
+          seg.text += (it.x - seg.x2 > Math.max(1.5, it.h * 0.22) ? ' ' : '') + it.str;
           seg.x2 = Math.max(seg.x2, it.x + it.w);
           seg.h = Math.max(seg.h, it.h);
         } else {
@@ -330,7 +343,7 @@ var DocReader = (function () {
           line.segments.push(seg);
         }
       });
-      line.segments.forEach(function (s) { s.text = clean(s.text); });
+      line.segments.forEach(function (s) { s.text = clean(despace(s.text)); });
       line.text = line.segments.map(function (s) { return s.text; }).join(' ');
       line.h = Math.max.apply(null, line.items.map(function (i) { return i.h; }));
     });
