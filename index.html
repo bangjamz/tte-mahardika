@@ -513,8 +513,11 @@
     show('homeApply', !!window.VERIFY_AJUKAN);
     showHome(!hasToken);
     $('homeCheck').addEventListener('click', function () {
-      show('lookupCard', true);
-      $('homeCheck').setAttribute('aria-expanded', 'true');
+      // Klik pertama membuka bagian Cek dokumen, klik berikutnya menutupnya lagi.
+      var open = $('lookupCard').classList.contains('hidden');
+      show('lookupCard', open);
+      $('homeCheck').setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open) return;
       $('lookupCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       $('lookupBtn').focus();
     });
