@@ -110,6 +110,14 @@
   .signer-row .signer-num { font-weight: 700; color: var(--muted); }
   .signer-row.invalid input { border-color: var(--red); }
   .field.auto input, .field.auto select, .signer-row.auto input { background: #fff8dc; }
+  .signer-group { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #fff; }
+  .signer-group.sel { border-color: var(--red); }
+  .signer-name { font-weight: 600; font-size: 14px; margin-bottom: 6px; overflow-wrap: anywhere; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; max-height: 132px; overflow: auto; }
+  .chip { display: inline-flex; border: 1px solid var(--gray); border-radius: 999px; overflow: hidden; font-size: 13px; }
+  .chip.sel { border-color: var(--red); background: var(--bad-bg); font-weight: 700; }
+  .chip button { border: 0; background: none; font: inherit; padding: 4px 8px; cursor: pointer; color: var(--text); min-height: 28px; }
+  .chip button + button { border-left: 1px solid var(--border); color: var(--red); font-weight: 700; }
   .signer-pick { display: block; width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font: inherit; font-size: 14px; cursor: pointer; }
   .signer-pick.sel { border-color: var(--red); background: var(--bad-bg); font-weight: 600; }
   .signer-pick small { display: block; color: var(--muted); font-weight: 400; }
@@ -348,9 +356,10 @@
     <div id="footName" style="font-weight:600"></div>
     <div id="footAddress"></div>
     <div id="footContact"></div>
+    <div style="margin-top:8px"><a class="hidden" id="adminLink" href="#" rel="noopener">Masuk admin</a></div>
   </footer>
 
-  <script>window.VERIFY_API = "https://script.google.com/macros/s/AKfycbyXhK-T3Q-dsFps5be7MNawL1RudPth_ITQ5vQsetNVv7izUYgI71ov-Y27f4KZi2l0/exec"; window.VERIFY_SITE = "https://tte.mahardika.ac.id/"; window.VERIFY_AJUKAN = true;</script>
+  <script>window.VERIFY_API = "https://script.google.com/macros/s/AKfycbyXhK-T3Q-dsFps5be7MNawL1RudPth_ITQ5vQsetNVv7izUYgI71ov-Y27f4KZi2l0/exec"; window.VERIFY_SITE = "https://tte.mahardika.ac.id/"; window.VERIFY_AJUKAN = true; window.VERIFY_ADMIN = "https://script.google.com/macros/s/AKfycbyyiCyguHLn-N-Dv3hHb47B2VNARHtQzJZtNO5N4yKNdQMsndZfNfilEyRJsKjsP5lP/exec";</script>
 <script>
 (function () {
   'use strict';
@@ -442,13 +451,20 @@
   /** Satu penandatangan tampil seperti semula; lebih dari satu tampil sebagai daftar bernomor. */
   function addSigners(list, doc) {
     var signers = doc.signers && doc.signers.length ? doc.signers : [{ order: 1, name: doc.signerName, role: doc.signerRole }];
+    // Cara persetujuan tercatat: lewat tautan oleh penandatangan sendiri, atau dikonfirmasi admin atas instruksinya.
+    function approval(s) {
+      if (s.via === 'tautan') return 'Menyetujui lewat tautan' + (s.decidedAt ? ' pada ' + formatTime(s.decidedAt) : '');
+      return s.via === 'admin' ? 'Dikonfirmasi admin' : '';
+    }
     if (signers.length === 1) {
       addMeta(list, 'Penandatangan', signers[0].name);
       addMeta(list, 'Jabatan', signers[0].role);
+      addMeta(list, 'Persetujuan', approval(signers[0]));
       return;
     }
     signers.forEach(function (s) {
-      addMeta(list, 'Penandatangan ' + s.order, s.name, s.role, s.order === signerOrder ? 'QR yang Anda buka' : '');
+      var note = approval(s);
+      addMeta(list, 'Penandatangan ' + s.order, s.name, s.role + (note ? ' \u00b7 ' + note : ''), s.order === signerOrder ? 'QR yang Anda buka' : '');
     });
   }
 
@@ -714,6 +730,7 @@
   if (API && window.VERIFY_SITE) $('hostHint').textContent = window.VERIFY_SITE;
   if (API) {
     document.body.classList.add('has-nav');
+    if (window.VERIFY_ADMIN) { $('adminLink').href = window.VERIFY_ADMIN; show('adminLink', true); }
     // Bagian dan menu pengajuan hanya tampil bila halaman pengajuan ikut dirakit.
     Array.prototype.forEach.call(document.querySelectorAll('.apply-only, #siteNav a[data-nav="ajukan"]'), function (n) {
       n.classList.toggle('hidden', !window.VERIFY_AJUKAN);
